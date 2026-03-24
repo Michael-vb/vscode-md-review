@@ -20,16 +20,115 @@
     "Other"
   ],
   "activationEvents": [
-    "onCommand:markdownReview.hello"
+    "onLanguage:markdown"
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "configurationDefaults": {
+      "comments.openView": "never"
+    },
     "commands": [
       {
-        "command": "markdownReview.hello",
-        "title": "Hello (Markdown Review)"
+        "command": "markdownReview.addComment",
+        "title": "Markdown Review: Add comment"
+      },
+      {
+        "command": "markdownReview.createNote",
+        "title": "Add review note",
+        "enablement": "!commentIsEmpty"
+      },
+      {
+        "command": "markdownReview.editNote",
+        "title": "Edit"
+      },
+      {
+        "command": "markdownReview.deleteNote",
+        "title": "Delete review"
+      },
+      {
+        "command": "markdownReview.deleteNoteComment",
+        "title": "Delete note"
+      },
+      {
+        "command": "markdownReview.saveNote",
+        "title": "Save"
+      },
+      {
+        "command": "markdownReview.cancelSaveNote",
+        "title": "Cancel"
       }
-    ]
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "markdownReview.createNote",
+          "when": "false"
+        },
+        {
+          "command": "markdownReview.deleteNote",
+          "when": "false"
+        },
+        {
+          "command": "markdownReview.deleteNoteComment",
+          "when": "false"
+        },
+        {
+          "command": "markdownReview.saveNote",
+          "when": "false"
+        },
+        {
+          "command": "markdownReview.cancelSaveNote",
+          "when": "false"
+        },
+        {
+          "command": "markdownReview.editNote",
+          "when": "false"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "markdownReview.addComment",
+          "when": "editorLangId == markdown && editorHasSelection",
+          "group": "markdownReview@1"
+        }
+      ],
+      "comments/commentThread/context": [
+        {
+          "command": "markdownReview.createNote",
+          "group": "inline",
+          "when": "commentController == markdownReview && commentThreadIsEmpty"
+        },
+        {
+          "command": "markdownReview.deleteNote",
+          "group": "inline@2",
+          "when": "commentController == markdownReview && !commentThreadIsEmpty"
+        }
+      ],
+      "comments/comment/title": [
+        {
+          "command": "markdownReview.editNote",
+          "group": "group@1",
+          "when": "commentController == markdownReview"
+        },
+        {
+          "command": "markdownReview.deleteNoteComment",
+          "group": "group@2",
+          "when": "commentController == markdownReview && comment == canDelete"
+        }
+      ],
+      "comments/comment/context": [
+        {
+          "command": "markdownReview.cancelSaveNote",
+          "group": "inline@1",
+          "when": "commentController == markdownReview"
+        },
+        {
+          "command": "markdownReview.saveNote",
+          "group": "inline@2",
+          "when": "commentController == markdownReview"
+        }
+      ]
+    }
   },
   "scripts": {
     "compile": "tsc -p ./",
