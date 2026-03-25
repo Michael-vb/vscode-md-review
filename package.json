@@ -4,6 +4,7 @@
   "description": "Review Markdown plans and specs with anchored notes",
   "version": "0.0.1",
   "license": "MIT",
+  "icon": "icon.png",
   "publisher": "xMIkeXeeioi",
   "repository": {
     "type": "git",
