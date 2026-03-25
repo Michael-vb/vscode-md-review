@@ -41,6 +41,80 @@ export function activate(context: vscode.ExtensionContext): void {
 
 	context.subscriptions.push(commentController);
 
+	function activeMarkdownUri(): vscode.Uri | undefined {
+		const editor = vscode.window.activeTextEditor;
+		if (!editor || editor.document.languageId !== 'markdown') {
+			return undefined;
+		}
+		return editor.document.uri;
+	}
+
+	function fileLabel(uri: vscode.Uri): string {
+		const rel = vscode.workspace.asRelativePath(uri, false);
+		// asRelativePath may fall back to an absolute-ish string; prefer a stable URI in that case.
+		if (!rel || rel === uri.fsPath || rel.startsWith('..')) {
+			return uri.toString();
+		}
+		return rel;
+	}
+
+	function formatClipboardExportForFile(uri: vscode.Uri): string {
+		const threads = store
+			.getThreads(uri)
+			.slice()
+			.sort((a, b) =>
+				a.startLine !== b.startLine
+					? a.startLine - b.startLine
+					: a.startCharacter - b.startCharacter,
+			);
+
+		const lines: string[] = [];
+		lines.push(
+			'Each comment is tied to a specific file and line/range. Make edits that satisfy every comment.',
+		);
+		lines.push('');
+		lines.push(`File: ${fileLabel(uri)}`);
+		lines.push('');
+
+		for (const t of threads) {
+			const start1 = t.startLine + 1;
+			const end1 = t.endLine + 1;
+			const location = start1 === end1 ? `L${start1}` : `L${start1}-L${end1}`;
+			const range0 = `[${t.startLine}:${t.startCharacter}..${t.endLine}:${t.endCharacter}]`;
+			const body = t.comments[0]?.body?.trim() ?? '';
+
+			lines.push(`- Location: ${location} (range0: ${range0})`);
+			lines.push(`  Comment: ${body || '(empty)'}`);
+			lines.push('');
+		}
+
+		// Trim trailing blank line(s) for cleaner clipboard.
+		while (lines.length > 0 && lines[lines.length - 1] === '') {
+			lines.pop();
+		}
+		return `${lines.join('\n')}\n`;
+	}
+
+	async function copyFileReviewToClipboard(uri: vscode.Uri): Promise<void> {
+		const text = formatClipboardExportForFile(uri);
+		await vscode.env.clipboard.writeText(text);
+	}
+
+	async function copyAndCleanFileReview(uri: vscode.Uri): Promise<void> {
+		await copyFileReviewToClipboard(uri);
+
+		// Clean: remove all stored threads for this file.
+		for (const t of store.getThreads(uri)) {
+			store.deleteThread(uri, t.threadId);
+		}
+
+		// Also dispose any materialized threads currently visible for this URI.
+		for (const thread of registry.getThreadsForUri(uri)) {
+			registry.release(thread, uri);
+			thread.dispose();
+		}
+	}
+
 	function ensureThreadId(thread: vscode.CommentThread): string {
 		const existing = registry.getId(thread);
 		if (existing) {
@@ -247,6 +321,30 @@ export function activate(context: vscode.ExtensionContext): void {
 		}),
 	);
 	context.subscriptions.push(vscode.commands.registerCommand('markdownReview.addComment', addComment));
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand('markdownReview.copy', async () => {
+			const uri = activeMarkdownUri();
+			if (!uri) {
+				void vscode.window.showInformationMessage('Open a Markdown file to copy its review.');
+				return;
+			}
+			await copyFileReviewToClipboard(uri);
+			void vscode.window.showInformationMessage('Copied review to clipboard.');
+		}),
+	);
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand('markdownReview.copyAndClean', async () => {
+			const uri = activeMarkdownUri();
+			if (!uri) {
+				void vscode.window.showInformationMessage('Open a Markdown file to copy its review.');
+				return;
+			}
+			await copyAndCleanFileReview(uri);
+			void vscode.window.showInformationMessage('Copied review and cleaned notes for this file.');
+		}),
+	);
 
 	for (const doc of vscode.workspace.textDocuments) {
 		if (doc.languageId === 'markdown') {

@@ -33,6 +33,16 @@
         "title": "Markdown Review: Add comment"
       },
       {
+        "command": "markdownReview.copy",
+        "title": "Copy Review",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "markdownReview.copyAndClean",
+        "title": "Copy Review & Clean",
+        "icon": "$(trash)"
+      },
+      {
         "command": "markdownReview.createNote",
         "title": "Add review note",
         "enablement": "!commentIsEmpty"
@@ -56,6 +66,20 @@
       {
         "command": "markdownReview.cancelSaveNote",
         "title": "Cancel"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "markdownReview.copy",
+        "key": "ctrl+alt+c",
+        "mac": "cmd+alt+c",
+        "when": "editorTextFocus && resourceLangId == markdown"
+      },
+      {
+        "command": "markdownReview.copyAndClean",
+        "key": "ctrl+alt+x",
+        "mac": "cmd+alt+x",
+        "when": "editorTextFocus && resourceLangId == markdown"
       }
     ],
     "menus": {
@@ -83,6 +107,18 @@
         {
           "command": "markdownReview.editNote",
           "when": "false"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "markdownReview.copy",
+          "when": "resourceLangId == markdown",
+          "group": "navigation@0"
+        },
+        {
+          "command": "markdownReview.copyAndClean",
+          "when": "resourceLangId == markdown",
+          "group": "navigation@1"
         }
       ],
       "editor/context": [
