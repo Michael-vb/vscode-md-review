@@ -24,6 +24,17 @@ export type ThreadsByFile = Record<string, StoredThread[]>;
 export class NoteStore {
 	constructor(private readonly workspaceState: vscode.Memento) {}
 
+	listThreadUris(): vscode.Uri[] {
+		const map = this.loadMap();
+		const uris: vscode.Uri[] = [];
+		for (const [k, threads] of Object.entries(map)) {
+			if (Array.isArray(threads) && threads.length > 0) {
+				uris.push(vscode.Uri.parse(k));
+			}
+		}
+		return uris;
+	}
+
 	getThreads(uri: vscode.Uri): StoredThread[] {
 		const map = this.loadMap();
 		return map[uri.toString()] ?? [];

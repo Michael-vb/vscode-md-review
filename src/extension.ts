@@ -59,7 +59,8 @@ export function activate(context: vscode.ExtensionContext): void {
 		return rel;
 	}
 
-	function formatClipboardExportForFile(uri: vscode.Uri): string {
+	function formatClipboardExportForFile(uri: vscode.Uri, opts?: { includeHeader?: boolean }): string {
+		const includeHeader = opts?.includeHeader ?? true;
 		const threads = store
 			.getThreads(uri)
 			.slice()
@@ -70,10 +71,12 @@ export function activate(context: vscode.ExtensionContext): void {
 			);
 
 		const lines: string[] = [];
-		lines.push(
-			'Each comment is tied to a specific file and line/range. Make edits that satisfy every comment.',
-		);
-		lines.push('');
+		if (includeHeader) {
+			lines.push(
+				'Each comment is tied to a specific file and line/range. Make edits that satisfy every comment.',
+			);
+			lines.push('');
+		}
 		lines.push(`File: ${fileLabel(uri)}`);
 		lines.push('');
 
@@ -96,6 +99,25 @@ export function activate(context: vscode.ExtensionContext): void {
 			lines.pop();
 		}
 		return `${lines.join('\n')}\n`;
+	}
+
+	function formatClipboardExportForWorkspace(): { text: string; uris: vscode.Uri[] } {
+		const uris = store
+			.listThreadUris()
+			.slice()
+			.sort((a, b) => fileLabel(a).localeCompare(fileLabel(b)));
+
+		if (uris.length === 0) {
+			return { text: '', uris: [] };
+		}
+
+		const chunks: string[] = [];
+		for (let i = 0; i < uris.length; i++) {
+			const uri = uris[i]!;
+			chunks.push(formatClipboardExportForFile(uri, { includeHeader: i === 0 }));
+		}
+
+		return { text: chunks.join('\n---\n\n'), uris };
 	}
 
 	async function copyFileReviewToClipboard(uri: vscode.Uri): Promise<void> {
@@ -372,25 +394,41 @@ export function activate(context: vscode.ExtensionContext): void {
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand('markdownReview.copy', async () => {
-			const uri = activeMarkdownUri();
-			if (!uri) {
-				void vscode.window.showInformationMessage('Open a Markdown file to copy its review.');
+			const exported = formatClipboardExportForWorkspace();
+			if (!exported.text) {
+				void vscode.window.showInformationMessage('No stored review notes to copy.');
 				return;
 			}
-			await copyFileReviewToClipboard(uri);
-			void vscode.window.showInformationMessage('Copied review to clipboard.');
+			await vscode.env.clipboard.writeText(exported.text);
+			void vscode.window.showInformationMessage(
+				`Copied review notes for ${exported.uris.length} file(s) to clipboard.`,
+			);
 		}),
 	);
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand('markdownReview.copyAndClean', async () => {
-			const uri = activeMarkdownUri();
-			if (!uri) {
-				void vscode.window.showInformationMessage('Open a Markdown file to copy its review.');
+			const exported = formatClipboardExportForWorkspace();
+			if (!exported.text) {
+				void vscode.window.showInformationMessage('No stored review notes to copy.');
 				return;
 			}
-			await copyAndCleanFileReview(uri);
-			void vscode.window.showInformationMessage('Copied review and cleaned notes for this file.');
+
+			await vscode.env.clipboard.writeText(exported.text);
+
+			for (const uri of exported.uris) {
+				for (const t of store.getThreads(uri)) {
+					store.deleteThread(uri, t.threadId);
+				}
+				for (const thread of registry.getThreadsForUri(uri)) {
+					registry.release(thread, uri);
+					thread.dispose();
+				}
+			}
+
+			void vscode.window.showInformationMessage(
+				`Copied review notes and cleaned ${exported.uris.length} file(s).`,
+			);
 		}),
 	);
 

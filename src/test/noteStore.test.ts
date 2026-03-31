@@ -81,4 +81,42 @@ suite('NoteStore', () => {
 		store.deleteThread(uri, 't1');
 		assert.strictEqual(store.getThreads(uri).length, 0);
 	});
+
+	test('listThreadUris returns only files with stored threads', () => {
+		const store = new NoteStore(new FakeMemento());
+		const a = vscode.Uri.parse('file:///workspace/a.md');
+		const b = vscode.Uri.parse('file:///workspace/b.md');
+
+		assert.deepStrictEqual(store.listThreadUris(), []);
+
+		store.saveThread(a, {
+			threadId: 't1',
+			startLine: 0,
+			startCharacter: 0,
+			endLine: 0,
+			endCharacter: 1,
+			comments: [],
+		});
+		store.saveThread(b, {
+			threadId: 't2',
+			startLine: 0,
+			startCharacter: 0,
+			endLine: 0,
+			endCharacter: 1,
+			comments: [],
+		});
+
+		const got = store
+			.listThreadUris()
+			.map((u) => u.toString())
+			.sort();
+		assert.deepStrictEqual(got, [a.toString(), b.toString()].sort());
+
+		store.deleteThread(a, 't1');
+		const got2 = store
+			.listThreadUris()
+			.map((u) => u.toString())
+			.sort();
+		assert.deepStrictEqual(got2, [b.toString()]);
+	});
 });
