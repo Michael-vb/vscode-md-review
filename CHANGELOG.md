@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.0] - 2026-03-31
+
+### Added
+
+- Clipboard export now includes the first line of the originally selected text (`Selected: ...`) to provide more context per note.
+
+### Changed
+
+- **Copy Review** and **Copy Review & Clean** now export notes for all files in the workspace (grouped by file) instead of only the active file.
+- Fixed keyboard shortcuts for copy actions.
+
 ## [0.1.0] - 2026-03-25
 
 ### Added
