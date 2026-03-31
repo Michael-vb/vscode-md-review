@@ -7,6 +7,7 @@ import {
 	storedRangeToVSCode,
 	threadRangeToStored,
 } from './reviewComment';
+import { firstLineSnippet } from './selectionSnippet';
 import { ThreadRegistry } from './threadRegistry';
 
 const COMMENT_CONTROLLER_ID = 'markdownReview';
@@ -82,8 +83,10 @@ export function activate(context: vscode.ExtensionContext): void {
 			const location = start1 === end1 ? `L${start1}` : `L${start1}-L${end1}`;
 			const range0 = `[${t.startLine}:${t.startCharacter}..${t.endLine}:${t.endCharacter}]`;
 			const body = t.comments[0]?.body?.trim() ?? '';
+			const selected = t.selectedFirstLine;
 
 			lines.push(`- Location: ${location} (range0: ${range0})`);
+			lines.push(`  Selected: ${selected || '(unknown)'}`);
 			lines.push(`  Comment: ${body || '(empty)'}`);
 			lines.push('');
 		}
@@ -127,7 +130,9 @@ export function activate(context: vscode.ExtensionContext): void {
 
 	function applyReviewThreadDefaults(thread: vscode.CommentThread): void {
 		thread.canReply = false;
-		thread.label = BLANK_THREAD_LABEL;
+		if (!thread.label) {
+			thread.label = BLANK_THREAD_LABEL;
+		}
 	}
 
 	function persistThreadDoc(thread: vscode.CommentThread): void {
@@ -144,9 +149,12 @@ export function activate(context: vscode.ExtensionContext): void {
 			};
 		});
 		const comments = mapped.slice(0, 1);
+		const selectedFirstLine =
+			thread.label && thread.label !== BLANK_THREAD_LABEL ? thread.label : undefined;
 		store.saveThread(thread.uri, {
 			threadId: id,
 			...threadRangeToStored(thread.range),
+			selectedFirstLine,
 			comments,
 		});
 	}
@@ -163,6 +171,7 @@ export function activate(context: vscode.ExtensionContext): void {
 			const range = storedRangeToVSCode(stored);
 			const thread = commentController.createCommentThread(uri, range, []);
 			applyReviewThreadDefaults(thread);
+			thread.label = stored.selectedFirstLine ? stored.selectedFirstLine : BLANK_THREAD_LABEL;
 			const first = stored.comments[0];
 			const comments = first
 				? [
@@ -183,11 +192,46 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 	}
 
+	function computeSelectedFirstLine(thread: vscode.CommentThread): string | undefined {
+		if (thread.label && thread.label !== BLANK_THREAD_LABEL) {
+			return thread.label;
+		}
+		const range = thread.range;
+		if (!range) {
+			return undefined;
+		}
+		const doc = vscode.workspace.textDocuments.find(
+			(d) => d.uri.toString() === thread.uri.toString(),
+		);
+		if (!doc) {
+			return undefined;
+		}
+		const selectedText = doc.getText(range);
+		if (selectedText) {
+			const snippet = firstLineSnippet(selectedText, 80);
+			return snippet || undefined;
+		}
+
+		// VS Code may create threads with an empty range (cursor position).
+		// In that case, fall back to the whole line at the anchor line.
+		if (range.start.line >= 0 && range.start.line < doc.lineCount) {
+			const lineText = doc.lineAt(range.start.line).text;
+			const snippet = firstLineSnippet(lineText, 80);
+			return snippet || undefined;
+		}
+
+		return undefined;
+	}
+
 	/** Single note per review: first submit only (no replies). */
 	function submitFirstNote(reply: vscode.CommentReply): void {
 		const thread = reply.thread;
 		if (thread.comments.length > 0) {
 			return;
+		}
+		const snippet = computeSelectedFirstLine(thread);
+		if (snippet) {
+			thread.label = snippet;
 		}
 		ensureThreadId(thread);
 		const newComment = new ReviewComment(
@@ -281,6 +325,10 @@ export function activate(context: vscode.ExtensionContext): void {
 			editor.selection,
 			[],
 		);
+		const snippet = computeSelectedFirstLine(thread);
+		if (snippet) {
+			thread.label = snippet;
+		}
 		applyReviewThreadDefaults(thread);
 		thread.collapsibleState = vscode.CommentThreadCollapsibleState.Expanded;
 		registry.register(thread, threadId, editor.document.uri);

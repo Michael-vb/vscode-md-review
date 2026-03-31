@@ -14,6 +14,8 @@ export interface StoredThread {
 	readonly startCharacter: number;
 	readonly endLine: number;
 	readonly endCharacter: number;
+	/** First line of the originally selected text (trimmed), for display/export. */
+	readonly selectedFirstLine?: string;
 	readonly comments: StoredComment[];
 }
 
